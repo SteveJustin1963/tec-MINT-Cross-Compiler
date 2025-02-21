@@ -342,309 +342,9 @@ Converted MINT code:
 === Code Execution Successful ===
 ```
 
-# Comprehensive Python program 
-that converts C code to MINT, including standard I/O and math operations.
+# Comprehensive Python program
 
-```
-import re
-from typing import List, Dict, Optional
-
-class MintCompiler:
-    def __init__(self):
-        # Available MINT variables and functions
-        self.vars = list('abcdefghijklmnopqrstuvwxyz')
-        self.funcs = list('ABCDEFGHIJKLMNOPQRSTUVWXY')  # Z reserved for interrupts
-        self.used_vars = {}
-        self.used_funcs = {}
-        self.current_function = None
-        
-        # C to MINT operation mappings
-        self.math_ops = {
-            '+': '+',
-            '-': '-',
-            '*': '*',
-            '/': '/',
-            '%': '/',  # Division remainder stored in /r
-            '<<': '{',
-            '>>': '}',
-            '&': '&',
-            '|': '|',
-            '^': '^',
-            '~': '~'
-        }
-        
-        # C standard library function mappings
-        self.stdlib_funcs = {
-            'printf': self._handle_printf,
-            'scanf': self._handle_scanf,
-            'strlen': self._handle_strlen,
-            'abs': self._handle_abs,
-            'pow': self._handle_pow,
-            'sqrt': self._handle_sqrt,
-            'sin': self._handle_trig,
-            'cos': self._handle_trig,
-            'tan': self._handle_trig
-        }
-        
-        # Type mappings
-        self.type_sizes = {
-            'char': 1,
-            'int': 2,
-            'short': 2,
-            'long': 4,
-            'float': 4,
-            'double': 8
-        }
-
-    def compile(self, c_code: str) -> str:
-        """Main compilation function"""
-        # Preprocess code
-        c_code = self._preprocess(c_code)
-        
-        # Split into functions
-        functions = self._split_functions(c_code)
-        
-        # Compile each function
-        mint_code = []
-        for func_name, func_body in functions.items():
-            mint_func = self._compile_function(func_name, func_body)
-            mint_code.append(mint_func)
-        
-        return '\n'.join(mint_code)
-
-    def _preprocess(self, code: str) -> str:
-        """Preprocess C code"""
-        # Remove comments
-        code = re.sub(r'//.*?\n|/\*.*?\*/', '', code, flags=re.S)
-        # Remove includes
-        code = re.sub(r'#include.*?\n', '', code)
-        # Remove extra whitespace
-        code = ' '.join(code.split())
-        return code
-
-    def _split_functions(self, code: str) -> Dict[str, str]:
-        """Split C code into separate functions"""
-        functions = {}
-        # Find function definitions
-        func_pattern = r'(\w+)\s+(\w+)\s*\((.*?)\)\s*{(.*?)}'
-        matches = re.finditer(func_pattern, code, re.DOTALL)
-        
-        for match in matches:
-            ret_type, name, params, body = match.groups()
-            functions[name] = {
-                'return_type': ret_type,
-                'params': params,
-                'body': body
-            }
-        
-        return functions
-
-    def _compile_function(self, name: str, func_info: dict) -> str:
-        """Compile a single function to MINT"""
-        # Get next available MINT function letter
-        if name not in self.used_funcs:
-            if not self.funcs:
-                raise ValueError("No more function names available")
-            self.used_funcs[name] = self.funcs.pop(0)
-        
-        mint_name = self.used_funcs[name]
-        self.current_function = mint_name
-        
-        # Convert body
-        body = self._compile_block(func_info['body'])
-        
-        # Create MINT function
-        return f':{mint_name} {body} ;'
-
-    def _compile_block(self, block: str) -> str:
-        """Compile a block of C code to MINT"""
-        lines = [line.strip() for line in block.split(';') if line.strip()]
-        mint_lines = []
-        
-        for line in lines:
-            if '=' in line:
-                mint_lines.extend(self._handle_assignment(line))
-            elif any(op in line for op in self.math_ops):
-                mint_lines.extend(self._handle_expression(line))
-            elif any(func in line for func in self.stdlib_funcs):
-                mint_lines.extend(self._handle_stdlib_call(line))
-            elif 'for' in line:
-                mint_lines.extend(self._handle_for_loop(line))
-            elif 'while' in line:
-                mint_lines.extend(self._handle_while_loop(line))
-            elif 'if' in line:
-                mint_lines.extend(self._handle_if_statement(line))
-                
-        return ' '.join(mint_lines)
-
-    def _handle_assignment(self, line: str) -> List[str]:
-        """Handle variable assignment"""
-        parts = line.split('=')
-        var = parts[0].strip()
-        expr = parts[1].strip()
-        
-        # Get or create MINT variable name
-        if var not in self.used_vars:
-            if not self.vars:
-                raise ValueError("No more variable names available")
-            self.used_vars[var] = self.vars.pop(0)
-        
-        mint_var = self.used_vars[var]
-        expr_code = self._handle_expression(expr)
-        
-        return expr_code + [mint_var, '!']
-
-    def _handle_expression(self, expr: str) -> List[str]:
-        """Convert C expression to MINT RPN"""
-        tokens = self._tokenize(expr)
-        rpn = self._to_rpn(tokens)
-        return rpn
-
-    def _handle_stdlib_call(self, line: str) -> List[str]:
-        """Handle C standard library function calls"""
-        func_name = re.match(r'(\w+)\(', line).group(1)
-        if func_name in self.stdlib_funcs:
-            return self.stdlib_funcs[func_name](line)
-        return []
-
-    def _handle_printf(self, line: str) -> List[str]:
-        """Handle printf function"""
-        # Extract format string and arguments
-        match = re.match(r'printf\("([^"]*)"(.*)\)', line)
-        if not match:
-            return []
-            
-        fmt, args = match.groups()
-        mint_code = []
-        
-        # Handle format string
-        if fmt:
-            mint_code.append(f'`{fmt}`')
-            
-        # Handle arguments
-        if args:
-            args = [arg.strip() for arg in args.split(',')[1:]]
-            for arg in args:
-                if arg in self.used_vars:
-                    mint_code.extend([self.used_vars[arg], '.'])
-                else:
-                    mint_code.extend([arg, '.'])
-                    
-        return mint_code
-
-    def _handle_scanf(self, line: str) -> List[str]:
-        """Handle scanf function"""
-        return ['/K']  # Basic implementation - just read a character
-
-    def _handle_strlen(self, line: str) -> List[str]:
-        """Handle strlen function"""
-        var = re.search(r'strlen\((.*?)\)', line).group(1)
-        return [self.used_vars.get(var, var), '/S']
-
-    def _handle_abs(self, line: str) -> List[str]:
-        """Handle abs function"""
-        var = re.search(r'abs\((.*?)\)', line).group(1)
-        mint_var = self.used_vars.get(var, var)
-        return [mint_var, '"', '0', '<', '(', '-1', '*', ')', '/E', mint_var]
-
-    def _handle_pow(self, line: str) -> List[str]:
-        """Handle power function"""
-        match = re.search(r'pow\((.*?),(.*?)\)', line)
-        base, exp = match.groups()
-        # Implement power using multiplication loop
-        mint_code = [
-            '1', 't', '!',  # result = 1
-            exp, '(',       # loop exp times
-            't', base, '*', 't', '!',  # result *= base
-            ')'
-        ]
-        return mint_code
-
-    def _handle_trig(self, line: str) -> List[str]:
-        """Handle trigonometric functions"""
-        # Note: MINT doesn't have built-in trig functions
-        # This would require implementing them or using lookup tables
-        return ['// Trig functions not implemented']
-
-    def _tokenize(self, expr: str) -> List[str]:
-        """Tokenize C expression"""
-        tokens = []
-        current = ''
-        
-        for char in expr:
-            if char.isspace():
-                if current:
-                    tokens.append(current)
-                    current = ''
-            elif char in self.math_ops:
-                if current:
-                    tokens.append(current)
-                    current = ''
-                tokens.append(char)
-            else:
-                current += char
-                
-        if current:
-            tokens.append(current)
-            
-        return tokens
-
-    def _to_rpn(self, tokens: List[str]) -> List[str]:
-        """Convert tokens to RPN"""
-        precedence = {
-            '+': 1, '-': 1,
-            '*': 2, '/': 2,
-            '<<': 3, '>>': 3,
-            '&': 4, '|': 4, '^': 4
-        }
-        
-        output = []
-        operators = []
-        
-        for token in tokens:
-            if token in self.math_ops:
-                while (operators and operators[-1] in precedence and 
-                       precedence[operators[-1]] >= precedence[token]):
-                    output.append(self.math_ops[operators.pop()])
-                operators.append(token)
-            else:
-                # Handle variables and numbers
-                if token in self.used_vars:
-                    output.append(self.used_vars[token])
-                else:
-                    output.append(token)
-        
-        while operators:
-            output.append(self.math_ops[operators.pop()])
-            
-        return output
-
-# Example usage
-def test_compiler():
-    c_code = """
-    #include <stdio.h>
-    int main() {
-        int x = 5;
-        int y = 10;
-        int z = x + y;
-        printf("Sum is: %d\\n", z);
-        return 0;
-    }
-    """
-    
-    compiler = MintCompiler()
-    mint_code = compiler.compile(c_code)
-    print("C code:")
-    print(c_code)
-    print("\nMINT code:")
-    print(mint_code)
-
-if __name__ == "__main__":
-    test_compiler()
-```
-
-I'll create a comprehensive Python program that converts C code to MINT, including standard I/O and math operations.
-
+Create a comprehensive Python program that converts C code to MINT, including standard I/O and math operations.
 
 
 This compiler handles:
@@ -696,5 +396,354 @@ mint_code = compiler.compile(c_code)
 print(mint_code)
 ```
 
+
+
+
+
+
+
+```
+import re
+from typing import List, Dict
+
+class MintCompiler:
+    def __init__(self):
+        # Available MINT variables and functions
+        self.vars = list('abcdefghijklmnopqrstuvwxyz')
+        self.funcs = list('ABCDEFGHIJKLMNOPQRSTUVWXY')  # Z reserved for interrupts
+        self.used_vars = {}
+        self.used_funcs = {}
+        self.current_function = None
+        
+        # C to MINT operation mappings
+        self.math_ops = {
+            '+': '+',
+            '-': '-',
+            '*': '*',
+            '/': '/',
+            '%': '/',  # Division remainder stored in /r
+            '<<': '{',
+            '>>': '}',
+            '&': '&',
+            '|': '|',
+            '^': '^',
+            '~': '~'
+        }
+        
+        # C standard library function mappings
+        self.stdlib_funcs = {
+            'printf': self._handle_printf,
+            'scanf': self._handle_scanf,
+            'strlen': self._handle_strlen,
+            'abs': self._handle_abs,
+            'pow': self._handle_pow
+        }
+
+    def compile(self, c_code: str) -> str:
+        """Main compilation function"""
+        # Preprocess code
+        c_code = self._preprocess(c_code)
+        
+        # Split into functions
+        functions = self._split_functions(c_code)
+        
+        # Compile each function
+        mint_code = []
+        for func_name, func_body in functions.items():
+            mint_func = self._compile_function(func_name, func_body)
+            mint_code.append(mint_func)
+        
+        return '\n'.join(mint_code)
+
+    def _preprocess(self, code: str) -> str:
+        """Preprocess C code"""
+        # Remove comments
+        code = re.sub(r'//.*?\n|/\*.*?\*/', '', code, flags=re.S)
+        # Remove includes
+        code = re.sub(r'#include.*?\n', '', code)
+        # Remove extra whitespace
+        code = ' '.join(code.split())
+        return code
+
+    def _split_functions(self, code: str) -> Dict[str, str]:
+        """Split C code into separate functions"""
+        functions = {}
+        # Find function definitions
+        func_pattern = r'(\w+)\s+(\w+)\s*\((.*?)\)\s*{(.*?)}'
+        matches = re.finditer(func_pattern, code, re.DOTALL)
+        
+        for match in matches:
+            ret_type, name, params, body = match.groups()
+            functions[name] = {
+                'return_type': ret_type,
+                'params': params,
+                'body': body
+            }
+        
+        return functions
+
+    def _compile_function(self, name: str, func_info: dict) -> str:
+        """Compile a single function to MINT"""
+        if name not in self.used_funcs:
+            if not self.funcs:
+                raise ValueError("No more function names available")
+            self.used_funcs[name] = self.funcs.pop(0)
+        
+        mint_name = self.used_funcs[name]
+        self.current_function = mint_name
+        
+        # Convert body
+        body = self._compile_block(func_info['body'])
+        
+        return f':{mint_name} {body} ;'
+
+    def _compile_block(self, block: str) -> str:
+        """Compile a block of C code to MINT"""
+        lines = [line.strip() for line in block.split(';') if line.strip()]
+        mint_lines = []
+        
+        for line in lines:
+            if '=' in line and not line.startswith('if') and not line.startswith('for'):
+                mint_lines.extend(self._handle_assignment(line))
+            elif any(op in line for op in self.math_ops):
+                mint_lines.extend(self._handle_expression(line))
+            elif any(func in line for func in self.stdlib_funcs):
+                mint_lines.extend(self._handle_stdlib_call(line))
+            elif line.startswith('for'):
+                mint_lines.extend(self._handle_for_loop(line))
+            elif line.startswith('while'):
+                mint_lines.extend(self._handle_while_loop(line))
+            elif line.startswith('if'):
+                mint_lines.extend(self._handle_if_statement(line))
+            elif line.startswith('return'):
+                continue  # Skip return statements for now
+                
+        return ' '.join(mint_lines)
+
+    def _handle_assignment(self, line: str) -> List[str]:
+        """Handle variable assignment"""
+        if 'int' in line:
+            line = line.replace('int', '').strip()
+            
+        parts = line.split('=')
+        var = parts[0].strip()
+        
+        # Handle array declarations
+        if '[' in var:
+            return self._handle_array_declaration(line)
+            
+        # Get or create MINT variable name
+        if var not in self.used_vars:
+            if not self.vars:
+                raise ValueError("No more variable names available")
+            self.used_vars[var] = self.vars.pop(0)
+        
+        mint_var = self.used_vars[var]
+        
+        if len(parts) == 1:  # Just declaration
+            return ['0', mint_var, '!']
+            
+        expr = parts[1].strip()
+        expr_code = self._handle_expression(expr)
+        
+        return expr_code + [mint_var, '!']
+
+    def _handle_array_declaration(self, line: str) -> List[str]:
+        """Handle array declaration and initialization"""
+        match = re.match(r'int\s+(\w+)\s*\[\s*\]\s*=\s*{(.*)}', line)
+        if match:
+            var_name, values = match.groups()
+            values = [v.strip() for v in values.split(',')]
+            mint_var = self._get_var_name(var_name)
+            return ['['] + values + [']', mint_var, '!']
+        return []
+
+    def _handle_expression(self, expr: str) -> List[str]:
+        """Convert C expression to MINT RPN"""
+        tokens = self._tokenize(expr)
+        return self._to_rpn(tokens)
+
+    def _handle_stdlib_call(self, line: str) -> List[str]:
+        """Handle C standard library function calls"""
+        func_name = re.match(r'(\w+)\(', line).group(1)
+        if func_name in self.stdlib_funcs:
+            return self.stdlib_funcs[func_name](line)
+        return []
+
+    def _handle_printf(self, line: str) -> List[str]:
+        """Handle printf function"""
+        match = re.match(r'printf\("([^"]*)"(.*)\)', line)
+        if not match:
+            return []
+            
+        fmt, args = match.groups()
+        mint_code = []
+        
+        if fmt:
+            mint_code.append(f'`{fmt}`')
+            
+        if args:
+            args = [arg.strip() for arg in args.split(',')[1:]]
+            for arg in args:
+                if arg in self.used_vars:
+                    mint_code.extend([self.used_vars[arg], '.'])
+                else:
+                    mint_code.extend([arg, '.'])
+                    
+        return mint_code
+
+    def _handle_scanf(self, line: str) -> List[str]:
+        """Handle scanf function"""
+        return ['/K']
+
+    def _handle_strlen(self, line: str) -> List[str]:
+        """Handle strlen function"""
+        var = re.search(r'strlen\((.*?)\)', line).group(1)
+        return [self.used_vars.get(var, var), '/S']
+
+    def _handle_abs(self, line: str) -> List[str]:
+        """Handle abs function"""
+        var = re.search(r'abs\((.*?)\)', line).group(1)
+        mint_var = self.used_vars.get(var, var)
+        return [mint_var, '"', '0', '<', '(', '-1', '*', ')', '/E', mint_var]
+
+    def _handle_pow(self, line: str) -> List[str]:
+        """Handle power function"""
+        match = re.search(r'pow\((.*?),(.*?)\)', line)
+        base, exp = match.groups()
+        return ['1', 't', '!', exp, '(', 't', base, '*', 't', '!', ')']
+
+    def _handle_for_loop(self, line: str) -> List[str]:
+        """Handle for loop"""
+        # Extract loop parameters
+        params = re.search(r'for\s*\((.*?);(.*?);(.*?)\)', line).groups()
+        init, cond, incr = [p.strip() for p in params]
+        
+        mint_code = []
+        # Handle initialization
+        if '=' in init:
+            mint_code.extend(self._handle_assignment(init))
+            
+        # Handle condition and create loop
+        if '<' in cond:
+            limit = cond.split('<')[1].strip()
+            mint_code.extend([limit, '('])
+            
+        return mint_code
+
+    def _handle_while_loop(self, line: str) -> List[str]:
+        """Handle while loop"""
+        cond = re.search(r'while\s*\((.*?)\)', line).group(1)
+        return ['/U', '(', cond, '/W']
+
+    def _handle_if_statement(self, line: str) -> List[str]:
+        """Handle if statement"""
+        cond = re.search(r'if\s*\((.*?)\)', line).group(1)
+        return [cond, '(']
+
+    def _tokenize(self, expr: str) -> List[str]:
+        """Tokenize C expression"""
+        tokens = []
+        current = ''
+        
+        for char in expr:
+            if char.isspace():
+                if current:
+                    tokens.append(current)
+                    current = ''
+            elif char in self.math_ops:
+                if current:
+                    tokens.append(current)
+                    current = ''
+                tokens.append(char)
+            else:
+                current += char
+                
+        if current:
+            tokens.append(current)
+            
+        return tokens
+
+    def _to_rpn(self, tokens: List[str]) -> List[str]:
+        """Convert tokens to RPN"""
+        precedence = {
+            '+': 1, '-': 1,
+            '*': 2, '/': 2,
+            '<<': 3, '>>': 3,
+            '&': 4, '|': 4, '^': 4
+        }
+        
+        output = []
+        operators = []
+        
+        for token in tokens:
+            if token in self.math_ops:
+                while (operators and operators[-1] in precedence and 
+                       precedence[operators[-1]] >= precedence[token]):
+                    output.append(self.math_ops[operators.pop()])
+                operators.append(token)
+            else:
+                if token in self.used_vars:
+                    output.append(self.used_vars[token])
+                else:
+                    output.append(token)
+        
+        while operators:
+            output.append(self.math_ops[operators.pop()])
+            
+        return output
+
+    def _get_var_name(self, c_var: str) -> str:
+        """Get or create a MINT variable name"""
+        if c_var not in self.used_vars:
+            if not self.vars:
+                raise ValueError("No more variables available")
+            self.used_vars[c_var] = self.vars.pop(0)
+        return self.used_vars[c_var]
+
+def test_compiler():
+    # Test with simple C code
+    c_code = """
+    #include <stdio.h>
+    int main() {
+        int x = 5;
+        int y = 10;
+        int z = x + y;
+        printf("Sum is: %d\\n", z);
+        return 0;
+    }
+    """
+    
+    compiler = MintCompiler()
+    mint_code = compiler.compile(c_code)
+    print("C code:")
+    print(c_code)
+    print("\nMINT code:")
+    print(mint_code)
+
+if __name__ == "__main__":
+    test_compiler()
+```
+
+### test
+
+```
+C code:
+
+    #include <stdio.h>
+    int main() {
+        int x = 5;
+        int y = 10;
+        int z = x + y;
+        printf("Sum is: %d\n", z);
+        return 0;
+    }
+    
+
+MINT code:
+:A 5 a ! 10 b ! a b + c ! printf("Sum is: d\n", z) / ;
+
+=== Code Execution Successful ===
+```
 
 
