@@ -103,7 +103,7 @@ end
 ```
 
 ```
->> test
+>> test in matlab
 Original C code:
 int main() {
     int x = 5;
@@ -118,7 +118,7 @@ Converted MINT code:
 >
 ```
 
-lets run it
+lets run it in MINT
 
 ```
 > A
