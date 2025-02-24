@@ -747,3 +747,241 @@ MINT code:
 ```
 
 
+# MINT in EXCEL
+
+MINT commands in Excel. The implementation uses a combination of Excel formulas to replicate MINT's functionality. This system:
+
+1. Uses string manipulation for stack operations
+2. Handles basic arithmetic
+3. Supports variable storage and recall
+4. Implements logical operations
+5. Provides bitwise operations
+6. Includes display operations
+
+Would you like me to focus on any specific part of the implementation or would you like me to create a sample Excel workbook that demonstrates these formulas in action?
+
+We could also:
+1. Add more complex operations
+2. Implement array handling
+3. Add error checking
+4. Create a user interface
+5. Add debugging capabilities
+
+
+# MINT Command Implementation in Excel
+
+## Spreadsheet Structure
+
+### Core Cells
+- A1: Input Command Cell
+- B1: Stack Display Cell
+- C1: Output Cell
+- D1: Carry Flag (/c)
+- E1: Remainder/Roll Flag (/r)
+- F1: Temporary Storage
+
+### Variable Storage (A2:Z2)
+- A2-Z2: Variables a-z
+
+### Command Parser (Column H)
+H1: =IF(A1="", "", TRIM(UPPER(A1)))
+
+### Stack Management Functions
+
+#### Push Number to Stack (I1)
+```excel
+=IF(ISNUMBER(VALUE(A1)), 
+    IF(B1="", A1, CONCATENATE(B1, ",", A1)),
+    B1)
+```
+
+#### Pop from Stack (I2)
+```excel
+=IF(FIND(",", B1)>0,
+    LEFT(B1, FIND(",", B1)-1),
+    B1)
+```
+
+#### Duplicate Top of Stack (")
+```excel
+=IF(RIGHT(H1,1)="""",
+    IF(B1="", "",
+    CONCATENATE(B1, ",", RIGHT(B1,FIND(",",CONCATENATE(B1,","))-1))),
+    B1)
+```
+
+#### Drop Top of Stack (')
+```excel
+=IF(RIGHT(H1,1)="'",
+    IF(FIND(",", B1)>0,
+        LEFT(B1, FIND(",", B1)-1),
+        ""),
+    B1)
+```
+
+#### Swap Top Two ($)
+```excel
+=IF(RIGHT(H1,1)="$",
+    IF(AND(FIND(",",B1)>0,FIND(",",B1)<LEN(B1)),
+        CONCATENATE(
+            MID(B1,FIND(",",B1)+1,FIND(",",CONCATENATE(B1,","),FIND(",",B1)+1)-FIND(",",B1)-1),
+            ",",
+            LEFT(B1,FIND(",",B1)-1)
+        ),
+        B1),
+    B1)
+```
+
+### Arithmetic Operations
+
+#### Addition (+)
+```excel
+=IF(RIGHT(H1,1)="+",
+    IF(AND(ISNUMBER(VALUE(I2)),ISNUMBER(VALUE(J2))),
+        TEXT(VALUE(I2)+VALUE(J2),"0"),
+        "Error"),
+    "")
+```
+
+#### Subtraction (-)
+```excel
+=IF(RIGHT(H1,1)="-",
+    IF(AND(ISNUMBER(VALUE(I2)),ISNUMBER(VALUE(J2))),
+        TEXT(VALUE(I2)-VALUE(J2),"0"),
+        "Error"),
+    "")
+```
+
+#### Multiplication (*)
+```excel
+=IF(RIGHT(H1,1)="*",
+    IF(AND(ISNUMBER(VALUE(I2)),ISNUMBER(VALUE(J2))),
+        TEXT(VALUE(I2)*VALUE(J2),"0"),
+        "Error"),
+    "")
+```
+
+#### Division (/)
+```excel
+=IF(RIGHT(H1,1)="/",
+    IF(AND(ISNUMBER(VALUE(I2)),ISNUMBER(VALUE(J2)),VALUE(J2)<>0),
+        TEXT(INT(VALUE(I2)/VALUE(J2)),"0"),
+        "Error"),
+    "")
+```
+
+### Variable Operations
+
+#### Store (!)
+```excel
+=IF(AND(RIGHT(H1,1)="!",LEN(H1)>1),
+    INDIRECT("R2C" & CHAR(64+MATCH(MID(H1,LEN(H1)-1,1),{"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"},0)),
+    VALUE(I2)),
+    "")
+```
+
+#### Variable Recall
+```excel
+=IF(AND(LEN(H1)=1,MATCH(H1,{"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"},0)>0),
+    INDIRECT("R2C" & CHAR(64+MATCH(H1,{"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"},0))),
+    "")
+```
+
+### Logical Operations
+
+#### Equals (=)
+```excel
+=IF(RIGHT(H1,1)="=",
+    IF(VALUE(I2)=VALUE(J2),"-1","0"),
+    "")
+```
+
+#### Greater Than (>)
+```excel
+=IF(RIGHT(H1,1)=">",
+    IF(VALUE(I2)>VALUE(J2),"-1","0"),
+    "")
+```
+
+#### Less Than (<)
+```excel
+=IF(RIGHT(H1,1)="<",
+    IF(VALUE(I2)<VALUE(J2),"-1","0"),
+    "")
+```
+
+### Bitwise Operations
+
+#### AND (&)
+```excel
+=IF(RIGHT(H1,1)="&",
+    TEXT(BITAND(VALUE(I2),VALUE(J2)),"0"),
+    "")
+```
+
+#### OR (|)
+```excel
+=IF(RIGHT(H1,1)="|",
+    TEXT(BITOR(VALUE(I2),VALUE(J2)),"0"),
+    "")
+```
+
+#### XOR (^)
+```excel
+=IF(RIGHT(H1,1)="^",
+    TEXT(BITXOR(VALUE(I2),VALUE(J2)),"0"),
+    "")
+```
+
+### Display Operations
+
+#### Print Decimal (.)
+```excel
+=IF(RIGHT(H1,1)=".",
+    TEXT(VALUE(I2),"0"),
+    "")
+```
+
+#### Print Hex (,)
+```excel
+=IF(RIGHT(H1,1)=",",
+    DEC2HEX(VALUE(I2)),
+    "")
+```
+
+### Setup Instructions
+
+1. Create a new Excel workbook
+2. Set up the core cells as described above
+3. Copy each formula to its respective cell
+4. Create named ranges for easier formula management:
+   - Stack: B1
+   - Input: A1
+   - Output: C1
+   - Variables: A2:Z2
+
+### Usage Example
+
+To calculate 10 + 20:
+1. Enter "10" in A1 (pushes 10 to stack)
+2. Enter "20" in A1 (pushes 20 to stack)
+3. Enter "+" in A1 (adds numbers and shows result)
+4. Enter "." in A1 (displays result)
+
+### Limitations
+
+1. Stack size is limited by Excel's text length limits
+2. No support for nested arrays
+3. Limited function definition capability
+4. No direct loop support
+5. Limited to 16-bit integer operations
+
+### Future Enhancements
+
+1. Add VBA support for more complex operations
+2. Implement array handling
+3. Add function definition capability
+4. Add loop support
+5. Add error handling for stack underflow/overflow
+
+ 
