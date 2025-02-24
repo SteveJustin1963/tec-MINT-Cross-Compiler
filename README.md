@@ -1,4 +1,8 @@
 # tec-MINT-Cross-Compiler
+
+none of this works, am still scratching
+
+
 - C to MINT
 - MINT to Excel
 
