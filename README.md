@@ -1,6 +1,6 @@
 # tec-MINT-Cross-Compiler
-convert source to MINT
-
+- C to MINT
+- MINT to Excel
 
 # C to MINT
 
