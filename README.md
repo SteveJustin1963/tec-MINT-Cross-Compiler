@@ -749,239 +749,150 @@ MINT code:
 
 # MINT in EXCEL
 
-MINT commands in Excel. The implementation uses a combination of Excel formulas to replicate MINT's functionality. This system:
+# MINT Code Processor in Excel
 
-1. Uses string manipulation for stack operations
-2. Handles basic arithmetic
-3. Supports variable storage and recall
-4. Implements logical operations
-5. Provides bitwise operations
-6. Includes display operations
+## Spreadsheet Layout
 
-Would you like me to focus on any specific part of the implementation or would you like me to create a sample Excel workbook that demonstrates these formulas in action?
-
-We could also:
-1. Add more complex operations
-2. Implement array handling
-3. Add error checking
-4. Create a user interface
-5. Add debugging capabilities
-
-
-# MINT Command Implementation in Excel
-
-## Spreadsheet Structure
-
-### Core Cells
-- A1: Input Command Cell
-- B1: Stack Display Cell
-- C1: Output Cell
-- D1: Carry Flag (/c)
-- E1: Remainder/Roll Flag (/r)
-- F1: Temporary Storage
-
-### Variable Storage (A2:Z2)
-- A2-Z2: Variables a-z
-
-### Command Parser (Column H)
-H1: =IF(A1="", "", TRIM(UPPER(A1)))
-
-### Stack Management Functions
-
-#### Push Number to Stack (I1)
-```excel
-=IF(ISNUMBER(VALUE(A1)), 
-    IF(B1="", A1, CONCATENATE(B1, ",", A1)),
-    B1)
+### Column Structure
+```
+A: Line Number (1,2,3...)
+B: MINT Code (one command per line)
+C: Stack State 
+D: Output
+E: Carry Flag (/c)
+F: Remainder/Roll Flag (/r)
+G-AF: Variables (a through z)
 ```
 
-#### Pop from Stack (I2)
+### Cell Formulas
+
+#### Line Numbers (Column A)
 ```excel
-=IF(FIND(",", B1)>0,
-    LEFT(B1, FIND(",", B1)-1),
-    B1)
+A2: =1
+A3: =IF(B3<>"", A2+1, "")  [Fill down]
 ```
 
-#### Duplicate Top of Stack (")
+#### Stack State (Column C)
 ```excel
-=IF(RIGHT(H1,1)="""",
-    IF(B1="", "",
-    CONCATENATE(B1, ",", RIGHT(B1,FIND(",",CONCATENATE(B1,","))-1))),
-    B1)
+C2: =IF(B2="", "",
+    SWITCH(RIGHT(B2,1),
+        "+", ProcessAdd(GetStack(C1)),
+        "-", ProcessSubtract(GetStack(C1)),
+        "*", ProcessMultiply(GetStack(C1)),
+        "/", ProcessDivide(GetStack(C1)),
+        """", DuplicateTop(GetStack(C1)),
+        "$", SwapTop(GetStack(C1)),
+        "!", StoreVariable(GetStack(C1), LEFT(B2,1)),
+        IF(ISNUMBER(VALUE(B2)), PushStack(GetStack(C1), B2), GetStack(C1))
+    ))
 ```
 
-#### Drop Top of Stack (')
+#### Output Display (Column D)
 ```excel
-=IF(RIGHT(H1,1)="'",
-    IF(FIND(",", B1)>0,
-        LEFT(B1, FIND(",", B1)-1),
-        ""),
-    B1)
-```
-
-#### Swap Top Two ($)
-```excel
-=IF(RIGHT(H1,1)="$",
-    IF(AND(FIND(",",B1)>0,FIND(",",B1)<LEN(B1)),
-        CONCATENATE(
-            MID(B1,FIND(",",B1)+1,FIND(",",CONCATENATE(B1,","),FIND(",",B1)+1)-FIND(",",B1)-1),
-            ",",
-            LEFT(B1,FIND(",",B1)-1)
-        ),
-        B1),
-    B1)
-```
-
-### Arithmetic Operations
-
-#### Addition (+)
-```excel
-=IF(RIGHT(H1,1)="+",
-    IF(AND(ISNUMBER(VALUE(I2)),ISNUMBER(VALUE(J2))),
-        TEXT(VALUE(I2)+VALUE(J2),"0"),
-        "Error"),
+D2: =IF(OR(RIGHT(B2,1)=".", RIGHT(B2,1)=","),
+    IF(RIGHT(B2,1)=".",
+        VALUE(LEFT(GetStack(C2), FIND(",", GetStack(C2)&",") - 1)),
+        DEC2HEX(VALUE(LEFT(GetStack(C2), FIND(",", GetStack(C2)&",") - 1)))
+    ),
     "")
 ```
 
-#### Subtraction (-)
+#### Carry Flag (Column E)
 ```excel
-=IF(RIGHT(H1,1)="-",
-    IF(AND(ISNUMBER(VALUE(I2)),ISNUMBER(VALUE(J2))),
-        TEXT(VALUE(I2)-VALUE(J2),"0"),
-        "Error"),
-    "")
+E2: =IF(B2="",E1,
+    IF(OR(RIGHT(B2,1)="+",RIGHT(B2,1)="-"),
+        IF(ABS(VALUE(ProcessOperation(GetStack(C1),RIGHT(B2,1))))>32767,1,0),
+        IF(B2="0 /c!",0,E1)))
 ```
 
-#### Multiplication (*)
+#### Remainder Flag (Column F)
 ```excel
-=IF(RIGHT(H1,1)="*",
-    IF(AND(ISNUMBER(VALUE(I2)),ISNUMBER(VALUE(J2))),
-        TEXT(VALUE(I2)*VALUE(J2),"0"),
-        "Error"),
-    "")
+F2: =IF(B2="",F1,
+    IF(RIGHT(B2,1)="/",
+        MOD(VALUE(LEFT(GetStack(C1), FIND(",", GetStack(C1)&",") - 1)),
+            VALUE(MID(GetStack(C1), FIND(",", GetStack(C1)) + 1, 999))),
+        IF(B2="0 /r!",0,F1)))
 ```
 
-#### Division (/)
+#### Variables (Columns G-AF)
 ```excel
-=IF(RIGHT(H1,1)="/",
-    IF(AND(ISNUMBER(VALUE(I2)),ISNUMBER(VALUE(J2)),VALUE(J2)<>0),
-        TEXT(INT(VALUE(I2)/VALUE(J2)),"0"),
-        "Error"),
-    "")
+G2: =IF(AND(RIGHT(B2,1)="!", LEFT(B2,1)="a"),
+        VALUE(LEFT(GetStack(C1), FIND(",", GetStack(C1)&",") - 1)),
+        G1)
+```
+[Similar formulas for other variables b-z]
+
+### Helper Functions (VBA)
+
+```vba
+Function GetStack(prevStack As String) As String
+    ' Returns current stack state
+End Function
+
+Function PushStack(stack As String, value As String) As String
+    ' Pushes a value onto the stack
+End Function
+
+Function ProcessAdd(stack As String) As String
+    ' Processes addition operation
+End Function
+
+' [Additional helper functions for other operations]
 ```
 
-### Variable Operations
+## Usage Example
 
-#### Store (!)
-```excel
-=IF(AND(RIGHT(H1,1)="!",LEN(H1)>1),
-    INDIRECT("R2C" & CHAR(64+MATCH(MID(H1,LEN(H1)-1,1),{"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"},0)),
-    VALUE(I2)),
-    "")
+Here's how the spreadsheet would process a simple MINT program:
+
+```
+B2: 10        C2: 10         D2:          E2: 0    F2: 0
+B3: 20        C3: 10,20      D3:          E3: 0    F3: 0
+B4: +         C4: 30         D4:          E4: 0    F4: 0
+B5: .         C5: 30         D5: 30       E5: 0    F5: 0
 ```
 
-#### Variable Recall
+## Advanced Features
+
+### Error Handling
 ```excel
-=IF(AND(LEN(H1)=1,MATCH(H1,{"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"},0)>0),
-    INDIRECT("R2C" & CHAR(64+MATCH(H1,{"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"},0))),
-    "")
+' Add to each operation formula
+=IF(CountStack(C1)<RequiredOperands(B2), "Error: Stack underflow", ...)
 ```
 
-### Logical Operations
-
-#### Equals (=)
+### Stack Validation
 ```excel
-=IF(RIGHT(H1,1)="=",
-    IF(VALUE(I2)=VALUE(J2),"-1","0"),
-    "")
+' Add to push operations
+=IF(LEN(C1)>255, "Error: Stack overflow", ...)
 ```
 
-#### Greater Than (>)
+### Variable Type Checking
 ```excel
-=IF(RIGHT(H1,1)=">",
-    IF(VALUE(I2)>VALUE(J2),"-1","0"),
-    "")
+' Add to variable operations
+=IF(NOT(ISNUMBER(VALUE(GetStack(C1)))), "Error: Type mismatch", ...)
 ```
 
-#### Less Than (<)
-```excel
-=IF(RIGHT(H1,1)="<",
-    IF(VALUE(I2)<VALUE(J2),"-1","0"),
-    "")
-```
+## Implementation Notes
 
-### Bitwise Operations
+1. Each row processes one MINT command
+2. State is maintained through cell references to previous row
+3. Stack is represented as comma-separated values
+4. Variables persist until explicitly changed
+5. Flags update based on operations
 
-#### AND (&)
-```excel
-=IF(RIGHT(H1,1)="&",
-    TEXT(BITAND(VALUE(I2),VALUE(J2)),"0"),
-    "")
-```
+## Limitations
 
-#### OR (|)
-```excel
-=IF(RIGHT(H1,1)="|",
-    TEXT(BITOR(VALUE(I2),VALUE(J2)),"0"),
-    "")
-```
-
-#### XOR (^)
-```excel
-=IF(RIGHT(H1,1)="^",
-    TEXT(BITXOR(VALUE(I2),VALUE(J2)),"0"),
-    "")
-```
-
-### Display Operations
-
-#### Print Decimal (.)
-```excel
-=IF(RIGHT(H1,1)=".",
-    TEXT(VALUE(I2),"0"),
-    "")
-```
-
-#### Print Hex (,)
-```excel
-=IF(RIGHT(H1,1)=",",
-    DEC2HEX(VALUE(I2)),
-    "")
-```
-
-### Setup Instructions
-
-1. Create a new Excel workbook
-2. Set up the core cells as described above
-3. Copy each formula to its respective cell
-4. Create named ranges for easier formula management:
-   - Stack: B1
-   - Input: A1
-   - Output: C1
-   - Variables: A2:Z2
-
-### Usage Example
-
-To calculate 10 + 20:
-1. Enter "10" in A1 (pushes 10 to stack)
-2. Enter "20" in A1 (pushes 20 to stack)
-3. Enter "+" in A1 (adds numbers and shows result)
-4. Enter "." in A1 (displays result)
-
-### Limitations
-
-1. Stack size is limited by Excel's text length limits
+1. Maximum stack depth limited by Excel cell character limit
 2. No support for nested arrays
 3. Limited function definition capability
 4. No direct loop support
-5. Limited to 16-bit integer operations
+5. 16-bit integer operations only
 
-### Future Enhancements
+## Future Enhancements
 
-1. Add VBA support for more complex operations
-2. Implement array handling
-3. Add function definition capability
-4. Add loop support
-5. Add error handling for stack underflow/overflow
+1. Support for arrays
+2. Function definitions
+3. Loop handling
+4. Debugging capabilities
+5. Step-through execution
 
- 
+   
